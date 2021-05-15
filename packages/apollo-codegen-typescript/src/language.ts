@@ -156,10 +156,6 @@ export default class TypescriptGenerator {
     return scope.join("_");
   }
 
-  public makeNullableType(type: t.TSType) {
-    return t.TSUnionType([type, t.TSNullKeyword()]);
-  }
-
   public isNullableType(type: t.TSType) {
     return (
       t.isTSUnionType(type) && type.types.some(type => t.isTSNullKeyword(type))
