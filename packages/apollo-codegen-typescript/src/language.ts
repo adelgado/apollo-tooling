@@ -6,7 +6,10 @@ import { commentBlockContent } from "apollo-codegen-core/lib/utilities/printing"
 
 import { sortEnumValues } from "apollo-codegen-core/lib/utilities/graphql";
 
-import { createTypeFromGraphQLTypeFunction } from "./helpers";
+import {
+  capitalizeFirstLetter,
+  createTypeFromGraphQLTypeFunction
+} from "./helpers";
 
 import * as t from "@babel/types";
 
@@ -35,7 +38,14 @@ export default class TypescriptGenerator {
     });
 
     const typeAlias = t.exportNamedDeclaration(
-      t.TSEnumDeclaration(t.identifier(name), enumMembers),
+      t.TSEnumDeclaration(
+        t.identifier(
+          this.options.tsInterfacePrefix
+            ? this.options.tsInterfacePrefix + capitalizeFirstLetter(name)
+            : name
+        ),
+        enumMembers
+      ),
       []
     );
 
@@ -67,7 +77,8 @@ export default class TypescriptGenerator {
 
     const inputType = t.exportNamedDeclaration(
       this.interface(name, fields, {
-        keyInheritsNullability: true
+        keyInheritsNullability: true,
+        prefix: this.options.tsInterfacePrefix
       }),
       []
     );
@@ -123,11 +134,15 @@ export default class TypescriptGenerator {
     name: string,
     fields: ObjectProperty[],
     {
-      keyInheritsNullability = false
+      keyInheritsNullability = false,
+      prefix = undefined
     }: {
       keyInheritsNullability?: boolean;
+      prefix?: string;
     } = {}
   ) {
+    name = prefix ? prefix + capitalizeFirstLetter(name) : name;
+
     return t.TSInterfaceDeclaration(
       t.identifier(name),
       undefined,

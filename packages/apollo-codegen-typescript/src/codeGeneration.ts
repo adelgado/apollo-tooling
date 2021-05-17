@@ -24,7 +24,7 @@ import { BasicGeneratedFile } from "apollo-codegen-core/lib/utilities/CodeGenera
 import { CompilerOptions } from "apollo-codegen-core/lib/compiler";
 import TypescriptGenerator, { ObjectProperty } from "./language";
 import Printer from "./printer";
-import { DEFAULT_FILE_EXTENSION } from "./helpers";
+import { capitalizeFirstLetter, DEFAULT_FILE_EXTENSION } from "./helpers";
 import {
   GraphQLType,
   isListType,
@@ -269,7 +269,9 @@ export class TypescriptAPIGenerator extends TypescriptGenerator {
     const properties = this.getPropertiesForVariant(variant);
 
     const exportedTypeAlias = this.exportDeclaration(
-      this.interface(operationName, properties)
+      this.interface(operationName, properties, {
+        prefix: this.context.options.tsInterfacePrefix
+      })
     );
 
     this.printer.enqueue(exportedTypeAlias);
@@ -287,7 +289,10 @@ export class TypescriptAPIGenerator extends TypescriptGenerator {
               name: variable.name,
               type: this.typeFromGraphQLType(variable.type)
             })),
-            { keyInheritsNullability: true }
+            {
+              keyInheritsNullability: true,
+              prefix: this.context.options.tsInterfacePrefix
+            }
           )
         )
       );
@@ -312,7 +317,9 @@ export class TypescriptAPIGenerator extends TypescriptGenerator {
 
       const name = this.nameFromScopeStack(this.scopeStack);
       const exportedTypeAlias = this.exportDeclaration(
-        this.interface(name, properties)
+        this.interface(name, properties, {
+          prefix: this.context.options.tsInterfacePrefix
+        })
       );
 
       this.printer.enqueue(exportedTypeAlias);
@@ -324,22 +331,32 @@ export class TypescriptAPIGenerator extends TypescriptGenerator {
 
         const name = this.nameFromScopeStack(this.scopeStack);
         const exportedTypeAlias = this.exportDeclaration(
-          this.interface(name, properties)
+          this.interface(name, properties, {
+            prefix: this.context.options.tsInterfacePrefix
+          })
         );
 
         this.printer.enqueue(exportedTypeAlias);
 
-        unionMembers.push(
-          t.identifier(this.nameFromScopeStack(this.scopeStack))
-        );
+        const unionMemberName = this.context.options.tsInterfacePrefix
+          ? this.context.options.tsInterfacePrefix +
+            capitalizeFirstLetter(this.nameFromScopeStack(this.scopeStack))
+          : this.nameFromScopeStack(this.scopeStack);
+
+        unionMembers.push(t.identifier(unionMemberName));
 
         this.scopeStackPop();
       });
 
+      const name = this.context.options.tsInterfacePrefix
+        ? this.context.options.tsInterfacePrefix +
+          capitalizeFirstLetter(this.nameFromScopeStack(this.scopeStack))
+        : this.nameFromScopeStack(this.scopeStack);
+
       this.printer.enqueue(
         this.exportDeclaration(
           this.typeAliasGenericUnion(
-            this.nameFromScopeStack(this.scopeStack),
+            name,
             unionMembers.map(id => t.TSTypeReference(id))
           )
         )
@@ -499,10 +516,12 @@ export class TypescriptAPIGenerator extends TypescriptGenerator {
 
       let res: ObjectProperty;
       if (field.selectionSet) {
-        res = this.handleFieldSelectionSetValue(
-          t.identifier(this.nameFromScopeStack(this.scopeStack)),
-          field
-        );
+        const nameFromScopeStack = this.nameFromScopeStack(this.scopeStack);
+        const name = this.context.options.tsInterfacePrefix
+          ? this.context.options.tsInterfacePrefix +
+            capitalizeFirstLetter(nameFromScopeStack)
+          : nameFromScopeStack;
+        res = this.handleFieldSelectionSetValue(t.identifier(name), field);
       } else {
         res = this.handleFieldValue(field, variant);
       }
@@ -530,7 +549,9 @@ export class TypescriptAPIGenerator extends TypescriptGenerator {
       const variant = variants[0];
       const properties = this.getPropertiesForVariant(variant);
       exportedTypeAlias = this.exportDeclaration(
-        this.interface(this.nameFromScopeStack(this.scopeStack), properties)
+        this.interface(this.nameFromScopeStack(this.scopeStack), properties, {
+          prefix: this.context.options.tsInterfacePrefix
+        })
       );
     } else {
       const identifiers = variants.map(variant => {
@@ -539,11 +560,19 @@ export class TypescriptAPIGenerator extends TypescriptGenerator {
         const identifierName = this.nameFromScopeStack(this.scopeStack);
 
         this.printer.enqueue(
-          this.exportDeclaration(this.interface(identifierName, properties))
+          this.exportDeclaration(
+            this.interface(identifierName, properties, {
+              prefix: this.context.options.tsInterfacePrefix
+            })
+          )
         );
 
         this.scopeStackPop();
-        return t.identifier(identifierName);
+        const name = this.context.options.tsInterfacePrefix
+          ? this.context.options.tsInterfacePrefix +
+            capitalizeFirstLetter(identifierName)
+          : identifierName;
+        return t.identifier(name);
       });
 
       exportedTypeAlias = this.exportDeclaration(
