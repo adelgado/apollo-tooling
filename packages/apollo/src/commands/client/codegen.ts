@@ -109,6 +109,9 @@ export default class Generate extends ClientCommand {
     tsFileExtension: flags.string({
       description:
         'By default, TypeScript will output "ts" files. Set "tsFileExtension" to specify a different file extension, for example "d.ts"'
+    }),
+    tsInterfacePrefix: flags.string({
+      description: "Prefix interfaces"
     })
   };
 
@@ -239,6 +242,7 @@ export default class Generate extends ClientCommand {
                       flags.useReadOnlyTypes || flags.useFlowReadOnlyTypes,
                     globalTypesFile: flags.globalTypesFile,
                     tsFileExtension: flags.tsFileExtension,
+                    tsInterfacePrefix: flags.tsInterfacePrefix,
                     suppressSwiftMultilineStringLiterals:
                       flags.suppressSwiftMultilineStringLiterals,
                     omitDeprecatedEnumCases: flags.omitDeprecatedEnumCases,
