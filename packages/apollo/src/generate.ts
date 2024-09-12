@@ -41,6 +41,7 @@ export type GenerationOptions = CompilerOptions &
   FlowCompilerOptions & {
     globalTypesFile?: string;
     tsFileExtension?: string;
+    tsInterfacePrefix?: string;
     rootPath?: string;
   };
 

@@ -63,7 +63,12 @@ export function createTypeFromGraphQLTypeFunction(
       // This won't happen; but for TypeScript completeness:
       return typeFromGraphQLType(graphQLType.ofType, typeName);
     } else {
-      return t.TSTypeReference(t.identifier(typeName || graphQLType.name));
+      const graphQLTypeName = compilerOptions.tsInterfacePrefix
+        ? compilerOptions.tsInterfacePrefix +
+          "J" +
+          capitalizeFirstLetter(graphQLType.name)
+        : graphQLType.name;
+      return t.TSTypeReference(t.identifier(typeName || graphQLTypeName));
     }
   }
 
@@ -83,3 +88,7 @@ export function createTypeFromGraphQLTypeFunction(
 }
 
 export { DEFAULT_FILE_EXTENSION };
+
+export function capitalizeFirstLetter(string: string) {
+  return string.charAt(0).toUpperCase() + string.slice(1);
+}

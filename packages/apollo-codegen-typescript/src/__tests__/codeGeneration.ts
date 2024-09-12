@@ -42,6 +42,30 @@ function compileMisc(
   return compileToIR(miscSchema, document, options);
 }
 
+function compileWithPrefix(
+  source: string,
+  options: CompilerOptions = {
+    mergeInFieldsFromFragmentSpreads: true,
+    addTypename: true,
+    tsInterfacePrefix: "T"
+  }
+): CompilerContext {
+  const document = parse(source);
+  return compileToIR(schema, document, options);
+}
+
+function compileMiscWithPrefix(
+  source: string,
+  options: CompilerOptions = {
+    mergeInFieldsFromFragmentSpreads: true,
+    addTypename: true,
+    tsInterfacePrefix: "T"
+  }
+): CompilerContext {
+  const document = parse(source);
+  return compileToIR(miscSchema, document, options);
+}
+
 describe("Typescript codeGeneration", () => {
   test("multiple files", () => {
     const context = compile(`
@@ -283,6 +307,201 @@ describe("Typescript codeGeneration", () => {
       }
     `);
 
+    const output = generateSource(context);
+    expect(output).toMatchSnapshot();
+  });
+
+  test("simple hero query with prefix", () => {
+    const context = compileWithPrefix(
+      `
+      query HeroName($episode: Episode) {
+        hero(episode: $episode) {
+          name
+          id
+        }
+      }
+    `
+    );
+
+    const output = generateSource(context);
+    expect(output).toMatchSnapshot();
+  });
+
+  test("simple mutation with prefix", () => {
+    const context = compileWithPrefix(`
+      mutation ReviewMovie($episode: Episode, $review: ReviewInput) {
+        createReview(episode: $episode, review: $review) {
+          stars
+          commentary
+        }
+      }
+    `);
+
+    const output = generateSource(context);
+    expect(output).toMatchSnapshot();
+  });
+
+  test("simple fragment with prefix", () => {
+    const context = compileWithPrefix(`
+      fragment SimpleFragment on Character{
+        name
+      }
+    `);
+
+    const output = generateSource(context);
+    expect(output).toMatchSnapshot();
+  });
+
+  test("fragment with fragment spreads with prefix", () => {
+    const context = compileWithPrefix(`
+      fragment simpleFragment on Character {
+        name
+      }
+
+      fragment anotherFragment on Character {
+        id
+        ...simpleFragment
+      }
+    `);
+
+    const output = generateSource(context);
+    expect(output).toMatchSnapshot();
+  });
+
+  test("fragment with fragment spreads with inline fragment with prefix", () => {
+    const context = compileWithPrefix(`
+      fragment simpleFragment on Character {
+        name
+      }
+
+      fragment anotherFragment on Character {
+        id
+        ...simpleFragment
+
+        ... on Human {
+          appearsIn
+        }
+      }
+    `);
+
+    const output = generateSource(context);
+    expect(output).toMatchSnapshot();
+  });
+
+  test("query with fragment spreads prefix", () => {
+    const context = compileWithPrefix(`
+      fragment simpleFragment on Character {
+        name
+      }
+
+      query HeroFragment($episode: Episode) {
+        hero(episode: $episode) {
+          ...simpleFragment
+          id
+        }
+      }
+    `);
+
+    const output = generateSource(context);
+    expect(output).toMatchSnapshot();
+  });
+
+  test("inline fragment with prefix", () => {
+    const context = compileWithPrefix(`
+      query HeroInlineFragment($episode: Episode) {
+        hero(episode: $episode) {
+          ... on Character {
+            name
+          }
+          id
+        }
+      }
+    `);
+
+    const output = generateSource(context);
+    expect(output).toMatchSnapshot();
+  });
+
+  test("inline fragment on type conditions with prefix", () => {
+    const context = compileWithPrefix(`
+      query HeroName($episode: Episode) {
+        hero(episode: $episode) {
+          name
+          id
+
+          ... on Human {
+            homePlanet
+            friends {
+              name
+            }
+          }
+
+          ... on Droid {
+            appearsIn
+          }
+        }
+      }
+    `);
+    const output = generateSource(context);
+    expect(output).toMatchSnapshot();
+  });
+
+  test("inline fragment on type conditions with differing inner fields with prefix", () => {
+    const context = compileWithPrefix(`
+      query HeroName($episode: Episode) {
+        hero(episode: $episode) {
+          name
+          id
+
+          ... on Human {
+            homePlanet
+            friends {
+              name
+            }
+          }
+
+          ... on Droid {
+            appearsIn
+            friends {
+              id
+            }
+          }
+        }
+      }
+    `);
+
+    const output = generateSource(context);
+    expect(output).toMatchSnapshot();
+  });
+
+  test("fragment spreads with inline fragments with prefix", () => {
+    const context = compileWithPrefix(`
+      query HeroName($episode: Episode) {
+        hero(episode: $episode) {
+          name
+          id
+          ...humanFragment
+          ...droidFragment
+        }
+      }
+
+      fragment humanFragment on Human {
+        homePlanet
+        friends {
+          ... on Human {
+            name
+          }
+
+          ... on Droid {
+            id
+          }
+        }
+      }
+
+      fragment droidFragment on Droid {
+        appearsIn
+      }
+    `);
     const output = generateSource(context);
     expect(output).toMatchSnapshot();
   });
@@ -616,6 +835,352 @@ describe("Typescript codeGeneration local / global", () => {
 
   test("duplicates", () => {
     const context = compileMisc(`
+      mutation duplicates($a: EnumCommentTestCase!, $b: EnumCommentTestCase!, $c: Duplicate!) {
+        duplicates(a: $a, b: $b, c: $c) {
+          propA
+          propB
+        }
+      }
+    `);
+
+    const output = generateLocalSource(context).map(f => ({
+      ...f,
+      content: f.content({
+        outputPath: "/some/file/ComponentA.tsx",
+        globalSourcePath: "/__generated__/globalTypes.ts"
+      })
+    }));
+    expect(output).toMatchSnapshot();
+    expect(generateGlobalSource(context)).toMatchSnapshot();
+  });
+
+  test("simple hero query with prefix", () => {
+    const context = compileWithPrefix(`
+      query HeroName($episode: Episode) {
+        hero(episode: $episode) {
+          name
+          id
+        }
+      }
+    `);
+
+    const output = generateLocalSource(context).map(f => ({
+      ...f,
+      content: f.content({
+        outputPath: "/some/file/ComponentA.tsx",
+        globalSourcePath: "/__generated__/globalTypes.ts"
+      })
+    }));
+    expect(output).toMatchSnapshot();
+    expect(generateGlobalSource(context)).toMatchSnapshot();
+  });
+
+  test("simple mutation with prefix", () => {
+    const context = compileWithPrefix(`
+      mutation ReviewMovie($episode: Episode, $review: ReviewInput) {
+        createReview(episode: $episode, review: $review) {
+          stars
+          commentary
+        }
+      }
+    `);
+
+    const output = generateLocalSource(context).map(f => ({
+      ...f,
+      content: f.content({
+        outputPath: "/some/file/ComponentA.tsx",
+        globalSourcePath: "/__generated__/globalTypes.ts"
+      })
+    }));
+    expect(output).toMatchSnapshot();
+    expect(generateGlobalSource(context)).toMatchSnapshot();
+  });
+
+  test("simple fragment with prefix", () => {
+    const context = compileWithPrefix(`
+      fragment SimpleFragment on Character{
+        name
+      }
+    `);
+
+    const output = generateLocalSource(context).map(f => ({
+      ...f,
+      content: f.content({
+        outputPath: "/some/file/ComponentA.tsx",
+        globalSourcePath: "/__generated__/globalTypes.ts"
+      })
+    }));
+    expect(output).toMatchSnapshot();
+    expect(generateGlobalSource(context)).toMatchSnapshot();
+  });
+
+  test("fragment with fragment spreads with prefix", () => {
+    const context = compileWithPrefix(`
+      fragment simpleFragment on Character {
+        name
+      }
+
+      fragment anotherFragment on Character {
+        id
+        ...simpleFragment
+      }
+    `);
+
+    const output = generateLocalSource(context).map(f => ({
+      ...f,
+      content: f.content({
+        outputPath: "/some/file/ComponentA.tsx",
+        globalSourcePath: "/__generated__/globalTypes.ts"
+      })
+    }));
+    expect(output).toMatchSnapshot();
+    expect(generateGlobalSource(context)).toMatchSnapshot();
+  });
+
+  test("fragment with fragment spreads with inline fragment with prefix", () => {
+    const context = compileWithPrefix(`
+      fragment simpleFragment on Character {
+        name
+      }
+
+      fragment anotherFragment on Character {
+        id
+        ...simpleFragment
+
+        ... on Human {
+          appearsIn
+        }
+      }
+    `);
+
+    const output = generateLocalSource(context).map(f => ({
+      ...f,
+      content: f.content({
+        outputPath: "/some/file/ComponentA.tsx",
+        globalSourcePath: "/__generated__/globalTypes.ts"
+      })
+    }));
+    expect(output).toMatchSnapshot();
+    expect(generateGlobalSource(context)).toMatchSnapshot();
+  });
+
+  test("query with fragment spreads with prefix", () => {
+    const context = compileWithPrefix(`
+      fragment simpleFragment on Character {
+        name
+      }
+
+      query HeroFragment($episode: Episode) {
+        hero(episode: $episode) {
+          ...simpleFragment
+          id
+        }
+      }
+    `);
+
+    const output = generateLocalSource(context).map(f => ({
+      ...f,
+      content: f.content({
+        outputPath: "/some/file/ComponentA.tsx",
+        globalSourcePath: "/__generated__/globalTypes.ts"
+      })
+    }));
+    expect(output).toMatchSnapshot();
+    expect(generateGlobalSource(context)).toMatchSnapshot();
+  });
+
+  test("inline fragment with prefix", () => {
+    const context = compileWithPrefix(`
+      query HeroInlineFragment($episode: Episode) {
+        hero(episode: $episode) {
+          ... on Character {
+            name
+          }
+          id
+        }
+      }
+    `);
+
+    const output = generateLocalSource(context).map(f => ({
+      ...f,
+      content: f.content({
+        outputPath: "/some/file/ComponentA.tsx",
+        globalSourcePath: "/__generated__/globalTypes.ts"
+      })
+    }));
+    expect(output).toMatchSnapshot();
+    expect(generateGlobalSource(context)).toMatchSnapshot();
+  });
+
+  test("inline fragment on type conditions with prefix", () => {
+    const context = compileWithPrefix(`
+      query HeroName($episode: Episode) {
+        hero(episode: $episode) {
+          name
+          id
+
+          ... on Human {
+            homePlanet
+            friends {
+              name
+            }
+          }
+
+          ... on Droid {
+            appearsIn
+          }
+        }
+      }
+    `);
+
+    const output = generateLocalSource(context).map(f => ({
+      ...f,
+      content: f.content({
+        outputPath: "/some/file/ComponentA.tsx",
+        globalSourcePath: "/__generated__/globalTypes.ts"
+      })
+    }));
+    expect(output).toMatchSnapshot();
+    expect(generateGlobalSource(context)).toMatchSnapshot();
+  });
+
+  test("inline fragment on type conditions with differing inner fields with prefix", () => {
+    const context = compileWithPrefix(`
+      query HeroName($episode: Episode) {
+        hero(episode: $episode) {
+          name
+          id
+
+          ... on Human {
+            homePlanet
+            friends {
+              name
+            }
+          }
+
+          ... on Droid {
+            appearsIn
+            friends {
+              id
+            }
+          }
+        }
+      }
+    `);
+
+    const output = generateLocalSource(context).map(f => ({
+      ...f,
+      content: f.content({
+        outputPath: "/some/file/ComponentA.tsx",
+        globalSourcePath: "/__generated__/globalTypes.ts"
+      })
+    }));
+    expect(output).toMatchSnapshot();
+    expect(generateGlobalSource(context)).toMatchSnapshot();
+  });
+
+  test("fragment spreads with inline fragments with prefix", () => {
+    const context = compileWithPrefix(`
+      query HeroName($episode: Episode) {
+        hero(episode: $episode) {
+          name
+          id
+          ...humanFragment
+          ...droidFragment
+        }
+      }
+
+      fragment humanFragment on Human {
+        homePlanet
+        friends {
+          ... on Human {
+            name
+          }
+
+          ... on Droid {
+            id
+          }
+        }
+      }
+
+      fragment droidFragment on Droid {
+        appearsIn
+      }
+    `);
+
+    const output = generateLocalSource(context).map(f => ({
+      ...f,
+      content: f.content({
+        outputPath: "/some/file/ComponentA.tsx",
+        globalSourcePath: "/__generated__/globalTypes.ts"
+      })
+    }));
+    expect(output).toMatchSnapshot();
+    expect(generateGlobalSource(context)).toMatchSnapshot();
+  });
+
+  test("handles multiline graphql comments with prefix", () => {
+    const context = compileMiscWithPrefix(`
+      query CustomScalar {
+        commentTest {
+          multiLine
+        }
+      }
+    `);
+
+    const output = generateLocalSource(context).map(f => ({
+      ...f,
+      content: f.content({
+        outputPath: "/some/file/ComponentA.tsx",
+        globalSourcePath: "/__generated__/globalTypes.ts"
+      })
+    }));
+    expect(output).toMatchSnapshot();
+    expect(generateGlobalSource(context)).toMatchSnapshot();
+  });
+
+  test("multiple nested non-null list enum with prefix", () => {
+    const context = compileMiscWithPrefix(`
+      query nesting {
+        nesting {
+          propA
+        }
+      }
+    `);
+
+    const output = generateLocalSource(context).map(f => ({
+      ...f,
+      content: f.content({
+        outputPath: "/some/file/ComponentA.tsx",
+        globalSourcePath: "/__generated__/globalTypes.ts"
+      })
+    }));
+    expect(output).toMatchSnapshot();
+    expect(generateGlobalSource(context)).toMatchSnapshot();
+  });
+
+  test("multiple nested list enum with prefix", () => {
+    const context = compileMiscWithPrefix(`
+      query nesting {
+        nesting {
+          propB
+        }
+      }
+    `);
+
+    const output = generateLocalSource(context).map(f => ({
+      ...f,
+      content: f.content({
+        outputPath: "/some/file/ComponentA.tsx",
+        globalSourcePath: "/__generated__/globalTypes.ts"
+      })
+    }));
+    expect(output).toMatchSnapshot();
+    expect(generateGlobalSource(context)).toMatchSnapshot();
+  });
+
+  test("duplicates with prefix", () => {
+    const context = compileMiscWithPrefix(`
       mutation duplicates($a: EnumCommentTestCase!, $b: EnumCommentTestCase!, $c: Duplicate!) {
         duplicates(a: $a, b: $b, c: $c) {
           propA
